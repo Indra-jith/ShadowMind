@@ -1,0 +1,39 @@
+# ============================================================
+# ShadowMind — Python Dependencies
+# ============================================================
+# This file lists every Python package our project needs.
+# WHY a requirements file: Instead of installing packages one by one,
+# we list them here and install ALL of them with one command:
+#   pip install -r requirements.txt
+# This also ensures anyone who clones our repo gets the exact same setup.
+# ============================================================
+
+# --- Web Framework ---
+# FastAPI: the web framework that handles HTTP requests (our API server)
+# uvicorn: the ASGI server that actually RUNS our FastAPI app
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+
+# --- LLM Provider ---
+# groq: official Python SDK to talk to Groq's API (where our LLM lives)
+groq==0.23.0
+
+# --- Environment Variables ---
+# python-dotenv: loads secrets from a .env file so we never hardcode API keys
+python-dotenv==1.0.1
+
+# --- Data Validation ---
+# pydantic: enforces data shapes and types on our models.
+# WHY: every pipeline node produces structured output — Pydantic guarantees
+# fields exist, types are correct, and values are in valid ranges.
+pydantic==2.10.0
+
+# --- Vector Database & Embeddings ---
+# qdrant-client: SDK to talk to our Qdrant Cloud vector database.
+# WHY: we need this to store and search evidence chunks by meaning.
+qdrant-client==1.12.1
+
+# cohere: official SDK for Cohere (we use it for embeddings).
+# WHY: models like embed-english-v3.0 turn our text into numbers (vectors)
+# with industry-leading quality and a generous 1000 req/min free tier.
+cohere==5.11.1
