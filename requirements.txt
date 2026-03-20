@@ -37,3 +37,10 @@ qdrant-client==1.12.1
 # WHY: models like embed-english-v3.0 turn our text into numbers (vectors)
 # with industry-leading quality and a generous 1000 req/min free tier.
 cohere==5.11.1
+
+# --- Data Ingestion & Scraping ---
+# requests: easiest way to download a webpage.
+requests==2.32.3
+
+# beautifulsoup4: parses HTML so we can extract just the text.
+beautifulsoup4==4.12.3

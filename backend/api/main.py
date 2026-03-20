@@ -49,6 +49,10 @@ from backend.api.schemas import InvestigateRequest, InvestigateResponse
 # (wrong types, missing fields), Pydantic catches it here.
 from backend.models.investigation import Hypothesis
 
+# Import our Qdrant search function — WHY: this is the "Retrieve" part of RAG.
+# Before asking the LLM to solve the mystery, we pull relevant facts.
+from backend.rag.database import search_evidence
+
 # ============================================================
 # SETUP — things that run ONCE when the server starts
 # ============================================================
@@ -135,10 +139,33 @@ RULES:
 - DO NOT include any text outside the JSON object
 - DO NOT use markdown code blocks — return raw JSON only"""
 
-    # Build the user prompt — same as Day 1 but now the LLM knows to
-    # return JSON instead of paragraphs.
-    user_prompt = f"Investigate this mystery: {request.mystery}"
+    # --------------------------------------------------------
+    # THE RETRIEVER (RAG)
+    # --------------------------------------------------------
+    # Step 1: Search Qdrant for evidence related to the user's mystery
+    # limit=5 because we want the top 5 most relevant overlapping chunks.
+    print(f"🕵️ Searching Qdrant for evidence related to: {request.mystery}")
+    try:
+        search_results = search_evidence(request.mystery, limit=5)
+    except Exception as e:
+        print(f"⚠️ Vector search failed: {e}")
+        search_results = []
+    
+    # Step 2: Format the evidence into a readable string for the LLM
+    evidence_text = "\n\n--- CRITICAL EVIDENCE FOUND IN DATABASE ---\n"
+    if not search_results:
+        evidence_text += "No evidence found for this topic.\n"
+    else:
+        for i, point in enumerate(search_results):
+            payload = point.payload
+            # We add the Source Name so the LLM knows where the fact came from
+            evidence_text += f"\n[Fact {i+1} | Source: {payload.get('source_name', 'Unknown')}]\n"
+            evidence_text += f"{payload.get('text', '')}\n"
 
+    # Step 3: Inject the evidence into the user prompt
+    # WHY: This is the "Augmented Generation" part of RAG. The LLM now reads
+    # our database chunks before answering!
+    user_prompt = f"Investigate this mystery: {request.mystery}\n{evidence_text}"
     # ⚠️ COST WARNING: This call uses Groq API (Llama 3.3 70B).
     # Free tier limit: 30 requests/minute, 6000 tokens/minute.
     # Each call with structured output uses ~600-1000 tokens.
