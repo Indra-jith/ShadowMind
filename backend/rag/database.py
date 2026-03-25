@@ -30,7 +30,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Our custom embedding generator we just built
-from backend.rag.embeddings import generate_embedding
+from backend.rag.embeddings import generate_embedding, generate_embeddings_batch
 
 # We'll use this later to parse the results back into our Pydantic model
 from backend.models.investigation import EvidenceChunk
@@ -141,6 +141,46 @@ def store_evidence(text: str, source_url: str, source_name: str, domain_tag: str
     )
     
     return point_id
+
+def store_evidence_batch(texts: list[str], source_url: str, source_name: str, domain_tag: str):
+    """
+    Takes a list of texts, turns them all into vectors in a single API call, 
+    and saves them all to Qdrant in a single database transaction.
+    
+    WHY BATCHING: This prevents hitting the 1,000 monthly API call limit
+    on free Cohere keys. Instead of hitting the limit after 1,000 paragraphs,
+    we hit it after 90,000 paragraphs!
+    """
+    if not q_client:
+        raise ValueError("Qdrant client not configured.")
+        
+    if not texts:
+        return
+        
+    # Generate all vectors at once (1 API call instead of N API calls)
+    vectors = generate_embeddings_batch(texts)
+    
+    # Prepare the list of points to send to Qdrant
+    points = []
+    for i, text in enumerate(texts):
+        points.append(
+            models.PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vectors[i],
+                payload={
+                    "text": text,
+                    "source_url": source_url,
+                    "source_name": source_name,
+                    "domain_tag": domain_tag
+                }
+            )
+        )
+        
+    # Send all points to Qdrant in one massive transaction
+    q_client.upsert(
+        collection_name=COLLECTION_NAME,
+        points=points
+    )
 
 
 def search_evidence(query: str, limit: int = 3):

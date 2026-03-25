@@ -73,6 +73,29 @@ def generate_embedding(text: str) -> list[float]:
     
     return vector
 
+def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
+    """
+    Takes a LIST of strings and returns a LIST of vectors in a single API call.
+    
+    WHY BATCHING? Cohere limits trial keys to 1000 API calls per month.
+    If we send 90 chunks in 1 API call instead of 90 API calls, we basically
+    multiply our free storage by 90x!
+    """
+    if not texts:
+        return []
+        
+    if not co_client:
+        raise ValueError("Cannot generate embedding: COHERE_API_KEY is missing or invalid.")
+        
+    # Cohere allows up to 96 texts per embed call.
+    response = co_client.embed(
+        texts=texts,
+        model="embed-english-v3.0",
+        input_type="search_document"
+    )
+    
+    return response.embeddings
+
 # ============================================================
 # TEST BLOCK
 # ============================================================
