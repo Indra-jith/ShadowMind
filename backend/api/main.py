@@ -29,7 +29,7 @@ import json
 
 # FastAPI — the web framework that handles HTTP requests and responses.
 # WHY: gives us routing, validation, auto-docs, and async support.
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 # Groq — the official Python SDK for the Groq API.
 # WHY: handles HTTP calls, authentication, and response parsing for us.
@@ -39,19 +39,20 @@ from groq import Groq
 # WHY: we NEVER hardcode API keys in source code.
 from dotenv import load_dotenv
 
-# Import our API schemas — WHY: these define the exact shape of
-# requests and responses. FastAPI uses them to validate input and
-# generate accurate docs at /docs.
-from backend.api.schemas import InvestigateRequest, InvestigateResponse
+from backend.api.schemas import (
+    InvestigateRequest, InvestigateResponse,
+    TestTheoryRequest, TestTheoryResponse,
+)
 
-# Import our Hypothesis model — WHY: we parse the LLM's JSON output
-# into validated Hypothesis objects. If the LLM returns bad data
-# (wrong types, missing fields), Pydantic catches it here.
+# Import our Hypothesis model
 from backend.models.investigation import Hypothesis
 
-# Import our Qdrant search function — WHY: this is the "Retrieve" part of RAG.
-# Before asking the LLM to solve the mystery, we pull relevant facts.
+# Import our Qdrant search function
 from backend.rag.database import search_evidence
+
+# Import the WebSocket streaming pipelines
+from backend.agent.streaming import stream_investigation, stream_theory_test
+from backend.agent.theory_pipeline import run_theory_pipeline
 
 # ============================================================
 # SETUP — things that run ONCE when the server starts
@@ -87,8 +88,108 @@ def health_check():
         "project": "ShadowMind",
         "tagline": "What they don't want you to find.",
         "status": "operational",
-        "version": "0.2.0",
+        "version": "0.3.0",
     }
+
+
+@app.websocket("/ws/investigate")
+async def ws_investigate(websocket: WebSocket):
+    """
+    WebSocket /ws/investigate — streams the full LangGraph investigation
+    node-by-node in real time.
+    
+    Protocol:
+    1. Client connects to ws://localhost:8000/ws/investigate
+    2. Client sends a JSON message: {"mystery": "What happened at..."}
+    3. Server streams structured events after each node completes
+    4. Server sends "investigation_complete" and closes
+    """
+    await websocket.accept()
+    
+    try:
+        # Wait for the client to send the mystery
+        message = await websocket.receive_json()
+        mystery = message.get("mystery", "")
+        
+        if not mystery:
+            await websocket.send_json({"event": "error", "message": "No mystery provided"})
+            await websocket.close()
+            return
+        
+        # Run the full streaming pipeline
+        await stream_investigation(websocket, mystery)
+        
+    except WebSocketDisconnect:
+        print("WebSocket client disconnected")
+    except Exception as e:
+        try:
+            await websocket.send_json({"event": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
+@app.post("/test-theory", response_model=TestTheoryResponse)
+def test_theory(request: TestTheoryRequest):
+    """
+    POST /test-theory — tests the user's personal theory against evidence.
+    Returns a verdict: CONFIRMED, PARTIALLY SUPPORTED, INSUFFICIENT EVIDENCE, or CONTRADICTED.
+    """
+    try:
+        final_state = run_theory_pipeline(request.mystery, request.user_theory)
+        
+        theory_verdict = final_state.get("theory_verdict")
+        hypotheses = final_state.get("hypotheses", [])
+        
+        if not theory_verdict:
+            raise HTTPException(status_code=500, detail="Theory testing failed")
+        
+        return TestTheoryResponse(
+            mystery=request.mystery,
+            user_theory=request.user_theory,
+            verdict=theory_verdict,
+            hypotheses=hypotheses,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.websocket("/ws/test-theory")
+async def ws_test_theory(websocket: WebSocket):
+    """
+    WebSocket /ws/test-theory — streams theory test events in real time.
+    Client sends: {"mystery": "...", "user_theory": "..."}
+    """
+    await websocket.accept()
+    try:
+        message = await websocket.receive_json()
+        mystery = message.get("mystery", "")
+        user_theory = message.get("user_theory", "")
+        
+        if not mystery or not user_theory:
+            await websocket.send_json({"event": "error", "message": "No mystery or theory provided"})
+            await websocket.close()
+            return
+        
+        await stream_theory_test(websocket, mystery, user_theory)
+    except WebSocketDisconnect:
+        print("WebSocket client disconnected")
+    except Exception as e:
+        try:
+            await websocket.send_json({"event": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 
 # response_model=InvestigateResponse tells FastAPI: "the response from this

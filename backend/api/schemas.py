@@ -25,7 +25,7 @@ from typing import List
 
 # Import our investigation models — WHY: the API response includes
 # Hypothesis objects, so we need access to the Hypothesis class.
-from backend.models.investigation import Hypothesis
+from backend.models.investigation import Hypothesis, TheoryVerdict
 
 
 # ============================================================
@@ -35,22 +35,7 @@ from backend.models.investigation import Hypothesis
 class InvestigateRequest(BaseModel):
     """
     The request body for POST /investigate.
-
-    WHY a Pydantic model instead of a raw string parameter:
-    1. Validates that the mystery is not empty
-    2. The request is now a JSON body (standard for APIs) instead of
-       a query parameter (which has URL length limits)
-    3. We can add more fields later (e.g., depth, max_hypotheses)
-       without changing the endpoint signature
-
-    Example request body:
-    {
-        "mystery": "What happened at Dyatlov Pass?"
-    }
     """
-
-    # mystery — the user's question / unexplained event to investigate.
-    # min_length=10 prevents garbage inputs like "hi" or "??"
     mystery: str = Field(
         ...,
         min_length=10,
@@ -60,40 +45,48 @@ class InvestigateRequest(BaseModel):
     )
 
 
+class TestTheoryRequest(BaseModel):
+    """
+    The request body for POST /test-theory.
+    
+    Example request body:
+    {
+        "mystery": "What happened at Dyatlov Pass?",
+        "user_theory": "An avalanche forced them out of the tent"
+    }
+    """
+    mystery: str = Field(
+        ...,
+        min_length=10,
+        max_length=1000,
+        description="The mystery to investigate",
+    )
+    user_theory: str = Field(
+        ...,
+        min_length=5,
+        max_length=500,
+        description="The user's personal theory to test",
+        examples=["An avalanche forced them out of the tent"],
+    )
+
+
 # ============================================================
 # RESPONSE SCHEMAS — what our API sends BACK to the client
 # ============================================================
 
 class InvestigateResponse(BaseModel):
-    """
-    The response body for POST /investigate.
-
-    WHY a Pydantic model instead of a raw dict:
-    1. FastAPI uses this to generate accurate API docs automatically
-    2. It guarantees the response always has the same shape — the
-       frontend can rely on "hypotheses" always being a list
-    3. If we accidentally forget to include a field, Pydantic catches
-       it before the response is sent
-
-    Example response:
-    {
-        "mystery": "What happened at Dyatlov Pass?",
-        "hypotheses": [...],
-        "model": "llama-3.3-70b-versatile"
-    }
-    """
-
-    # mystery — echoed back so the frontend knows which question was asked.
+    """The response body for POST /investigate."""
     mystery: str = Field(..., description="The original mystery that was investigated")
-
-    # hypotheses — the structured list of generated hypotheses.
-    # WHY a List[Hypothesis] and not raw text: each hypothesis is a validated
-    # Pydantic object with guaranteed fields (id, title, score, status).
-    # The frontend can directly render these without parsing text.
     hypotheses: List[Hypothesis] = Field(
         ...,
         description="Generated hypotheses for the mystery",
     )
-
-    # model — which LLM model was used (for transparency/debugging).
     model: str = Field(..., description="LLM model used for generation")
+
+
+class TestTheoryResponse(BaseModel):
+    """The response body for POST /test-theory."""
+    mystery: str = Field(..., description="The original mystery")
+    user_theory: str = Field(..., description="The user's submitted theory")
+    verdict: TheoryVerdict = Field(..., description="The verdict on the user's theory")
+    hypotheses: List[Hypothesis] = Field(..., description="All hypotheses tested")

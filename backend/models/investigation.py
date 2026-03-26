@@ -303,3 +303,56 @@ class InvestigationConclusion(BaseModel):
         default_factory=list,
         description="All source URLs used in the investigation",
     )
+
+
+# ============================================================
+# MODEL 6: TheoryVerdict
+# ============================================================
+# WHAT: The output of Theory Test Mode — tells the user if their
+#       personal theory was confirmed or destroyed by the evidence.
+# WHEN CREATED: The "verdict" node in the theory pipeline.
+# USED BY: API response for POST /test-theory, WebSocket events.
+# ============================================================
+
+class TheoryVerdict(BaseModel):
+    # did_user_theory_survive — the binary answer: did it pass the evidence test?
+    did_user_theory_survive: bool = Field(
+        ...,
+        description="Whether the user's theory survived evidence scoring",
+    )
+
+    # user_theory_confidence — the numeric score the LLM judge gave the user's theory
+    user_theory_confidence: float = Field(
+        ..., ge=0.0, le=1.0,
+        description="Confidence score for the user's theory after evidence evaluation",
+    )
+
+    # verdict_label — the human-readable verdict
+    verdict_label: Literal[
+        "CONFIRMED", "PARTIALLY SUPPORTED", "INSUFFICIENT EVIDENCE", "CONTRADICTED"
+    ] = Field(
+        ...,
+        description="Categorical verdict on the user's theory",
+    )
+
+    # supporting_evidence — evidence chunk IDs that back the user's theory
+    supporting_evidence: List[str] = Field(
+        default_factory=list,
+        description="Evidence IDs supporting the user's theory",
+    )
+
+    # contradicting_evidence — evidence chunk IDs that challenge the user's theory
+    contradicting_evidence: List[str] = Field(
+        default_factory=list,
+        description="Evidence IDs contradicting the user's theory",
+    )
+
+    # stronger_alternative — if a different theory scored higher, which one?
+    stronger_alternative: Optional[str] = Field(
+        default=None,
+        description="Title of a stronger alternative theory if one scored higher",
+    )
+
+    # summary — the full textual verdict paragraph
+    summary: str = Field(..., description="Full text summary of the theory verdict")
+

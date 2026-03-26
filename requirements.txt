@@ -44,3 +44,18 @@ requests==2.32.3
 
 # beautifulsoup4: parses HTML so we can extract just the text.
 beautifulsoup4==4.12.3
+
+# --- Agent Orchestration ---
+# langgraph: graph-based agent orchestration framework.
+# WHY: lets us build a multi-node detective pipeline with conditional
+# retry loops — something a linear chain cannot do.
+langgraph==0.2.74
+
+# langchain-core: minimal peer dependency required by langgraph.
+# WHY: langgraph depends on it for base types. We do NOT use full LangChain.
+langchain-core==0.3.37
+
+# tavily-python: live web search API designed for AI agents.
+# WHY: fallback when Qdrant evidence quality is too weak.
+# Free tier: 1000 searches/month.
+tavily-python==0.7.23
