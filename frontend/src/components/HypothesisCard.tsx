@@ -1,4 +1,4 @@
-import React from 'react';
+ 
 import { motion, AnimatePresence } from 'framer-motion';
 import { BrainCircuit, ExternalLink, ShieldCheck } from 'lucide-react';
 import { Hypothesis } from '../hooks/useInvestigation';

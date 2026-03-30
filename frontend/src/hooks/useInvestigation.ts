@@ -500,10 +500,10 @@ export function useInvestigation() {
 
                 if (node === 'retrieve_evidence') {
                   const evMap: Record<string, Evidence[]> = {
-                    hyp_001: [MOCK_EVIDENCE[0], MOCK_EVIDENCE[1]],
-                    hyp_002: [MOCK_EVIDENCE[1]],
-                    hyp_003: [MOCK_EVIDENCE[2]],
-                    hyp_004: [MOCK_EVIDENCE[3]],
+                    hyp_001: [MOCK_EVIDENCE[0] as Evidence, MOCK_EVIDENCE[1] as Evidence],
+                    hyp_002: [MOCK_EVIDENCE[1] as Evidence],
+                    hyp_003: [MOCK_EVIDENCE[2] as Evidence],
+                    hyp_004: [MOCK_EVIDENCE[3] as Evidence],
                   };
                   let evTotal = 0;
                   updated.hypotheses = prev.hypotheses.map((h) => {

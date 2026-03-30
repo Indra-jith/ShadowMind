@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCheck, X } from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 import { InvestigationState, PipelineStage } from '../hooks/useInvestigation';
 
 const PIPELINE_NODES = [
@@ -89,7 +89,6 @@ export default function TerminalSidebar({ state }: { state: InvestigationState }
             const status = getStatus(node.id, state.stage);
             const isActive = status === 'ACTIVE';
             const isComplete = status === 'COMPLETE';
-            const isPending = status === 'PENDING';
 
             let bgColor = 'transparent';
             let borderColor = 'rgba(112,112,160,0.3)';
