@@ -49,7 +49,7 @@ def _serialize_evidence_chunk(chunk: EvidenceChunk) -> dict:
     
     # Rename 'excerpt' to 'text' for the frontend
     base["text"] = base.pop("excerpt", "")
-    base["source_title"] = base.get("source_name", "Unknown")
+    base["source_name"] = base.get("source_name", "Unknown")
     
     return base
 
