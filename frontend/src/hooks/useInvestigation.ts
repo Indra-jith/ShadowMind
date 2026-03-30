@@ -4,54 +4,54 @@ import { useCallback, useEffect, useRef, useState } from 'react';
    TYPE DEFINITIONS
    ============================================================ */
 
-export type PipelineStage =
-  | 'idle'
-  | 'scanning'
-  | 'generating'
-  | 'retrieving'
-  | 'scoring'
-  | 'concluded';
+export type PipelineStage = 
+  | 'idle' | 'scanning' | 'generating' 
+  | 'retrieving' | 'scoring' | 'concluded';
+
+export type HypothesisStatus = 
+  | 'pending' | 'active' | 'survivor' | 'eliminated';
 
 export interface Evidence {
   id: string;
-  source_url: string;
-  source_name: string;
-  text: string;
-  domain_tag: string;
-  relevance_score: number;
-  hypothesis_id: string;
-  source_domain?: string;
+  url: string;
+  domain: string;
+  title: string;
+  excerpt: string;
   favicon?: string;
 }
 
 export interface Hypothesis {
   id: string;
   title: string;
-  description: string;
-  plausibility_score: number;
-  status: 'pending' | 'active' | 'eliminated' | 'surviving';
-  elimination_reason?: string | null;
+  body: string;
+  confidence: number;
+  status: HypothesisStatus;
   evidence: Evidence[];
-  confidence?: number;
+  eliminationReason?: string;
+  retrievedAt?: string;
 }
 
-export interface Conclusion {
-  surviving_hypothesis: string;
-  overall_confidence: number;
-  confidence_label: string;
-  key_evidence: string[];
-  caveats: string[];
-  summary: string;
-  all_sources: string[];
+export interface LogEntry {
+  timestamp: string;
+  message: string;
+  level: 'info' | 'warn' | 'error' | 'success';
 }
 
 export interface InvestigationState {
   stage: PipelineStage;
+  query: string;
   hypotheses: Hypothesis[];
-  terminalLogs: string[];
-  verdict: Conclusion | null;
+  logs: LogEntry[];
+  verdict: {
+    status: 'CASE RESOLVED' | 'INCONCLUSIVE' | null;
+    narrative: string;
+    caveats: string[];
+    sources: string[];
+    confidence: number;
+  } | null;
+  counters: { hypotheses: number; evidence: number; sources: number; };
+  startedAt: Date | null;
   isConnected: boolean;
-  error: string | null;
 }
 
 /* ============================================================
@@ -82,32 +82,32 @@ const MOCK_HYPOTHESES: Hypothesis[] = [
   {
     id: 'hyp_001',
     title: 'Government Cover-Up',
-    description: 'Evidence suggests systematic suppression of information by state intelligence agencies, including classified document redactions and witness intimidation campaigns.',
-    plausibility_score: 0.72,
+    body: 'Evidence suggests systematic suppression of information by state intelligence agencies, including classified document redactions and witness intimidation campaigns.',
+    confidence: 0,
     status: 'active',
     evidence: [],
   },
   {
     id: 'hyp_002',
     title: 'Natural Phenomenon',
-    description: 'Environmental and atmospheric conditions created a rare convergence of natural events that explain all observed anomalies without requiring human intervention.',
-    plausibility_score: 0.58,
+    body: 'Environmental and atmospheric conditions created a rare convergence of natural events that explain all observed anomalies without requiring human intervention.',
+    confidence: 0,
     status: 'active',
     evidence: [],
   },
   {
     id: 'hyp_003',
     title: 'Mass Hysteria Event',
-    description: 'Social contagion and media amplification transformed ordinary events into an extraordinary narrative through collective misperception and confirmation bias.',
-    plausibility_score: 0.41,
+    body: 'Social contagion and media amplification transformed ordinary events into an extraordinary narrative through collective misperception and confirmation bias.',
+    confidence: 0,
     status: 'active',
     evidence: [],
   },
   {
     id: 'hyp_004',
     title: 'Unknown Technology',
-    description: 'Physical evidence and expert testimony point to technology beyond publicly known capabilities, possibly from classified military programs or unknown origin.',
-    plausibility_score: 0.35,
+    body: 'Physical evidence and expert testimony point to technology beyond publicly known capabilities, possibly from classified military programs or unknown origin.',
+    confidence: 0,
     status: 'active',
     evidence: [],
   },
@@ -116,43 +116,31 @@ const MOCK_HYPOTHESES: Hypothesis[] = [
 const MOCK_EVIDENCE: Evidence[] = [
   {
     id: 'ev_001',
-    source_url: 'https://en.wikipedia.org/wiki/example',
-    source_name: 'Wikipedia',
-    text: 'Declassified documents from 1967 reveal that intelligence agencies actively monitored and suppressed civilian reports...',
-    domain_tag: 'government',
-    relevance_score: 0.89,
-    hypothesis_id: 'hyp_001',
-    source_domain: 'wikipedia.org',
+    url: 'https://en.wikipedia.org/wiki/example',
+    title: 'Wikipedia',
+    excerpt: 'Declassified documents from 1967 reveal that intelligence agencies actively monitored and suppressed civilian reports...',
+    domain: 'wikipedia.org',
   },
   {
     id: 'ev_002',
-    source_url: 'https://www.nature.com/articles/example',
-    source_name: 'Nature',
-    text: 'Atmospheric inversion layers combined with temperature gradients can produce optical phenomena consistent with reported observations...',
-    domain_tag: 'science',
-    relevance_score: 0.76,
-    hypothesis_id: 'hyp_002',
-    source_domain: 'nature.com',
+    url: 'https://www.nature.com/articles/example',
+    title: 'Nature',
+    excerpt: 'Atmospheric inversion layers combined with temperature gradients can produce optical phenomena consistent with reported observations...',
+    domain: 'nature.com',
   },
   {
     id: 'ev_003',
-    source_url: 'https://www.history.com/example',
-    source_name: 'History.com',
-    text: 'Similar patterns of mass sighting events have been documented throughout history, typically following periods of social anxiety...',
-    domain_tag: 'history',
-    relevance_score: 0.63,
-    hypothesis_id: 'hyp_003',
-    source_domain: 'history.com',
+    url: 'https://www.history.com/example',
+    title: 'History.com',
+    excerpt: 'Similar patterns of mass sighting events have been documented throughout history, typically following periods of social anxiety...',
+    domain: 'history.com',
   },
   {
     id: 'ev_004',
-    source_url: 'https://arxiv.org/abs/example',
-    source_name: 'ArXiv',
-    text: 'Analysis of radar data shows objects exhibiting flight characteristics inconsistent with known aircraft or atmospheric phenomena...',
-    domain_tag: 'science',
-    relevance_score: 0.71,
-    hypothesis_id: 'hyp_004',
-    source_domain: 'arxiv.org',
+    url: 'https://arxiv.org/abs/example',
+    title: 'ArXiv',
+    excerpt: 'Analysis of radar data shows objects exhibiting flight characteristics inconsistent with known aircraft or atmospheric phenomena...',
+    domain: 'arxiv.org',
   },
 ];
 
@@ -198,25 +186,22 @@ const MOCK_LOGS: Record<string, string[]> = {
   ],
 };
 
-function getMockConclusion(): Conclusion {
+function getMockConclusion() {
   return {
-    surviving_hypothesis: 'hyp_001',
-    overall_confidence: 0.72,
-    confidence_label: 'High',
-    key_evidence: ['ev_001', 'ev_002'],
+    status: 'CASE RESOLVED' as const,
+    narrative: 'After systematic analysis of all available evidence, the investigation concludes that the Government Cover-Up hypothesis (H-001) presents the strongest evidence-backed explanation. Declassified documents and verified witness testimony provide substantial corroboration, while competing hypotheses lacked sufficient evidentiary support to survive rigorous scoring. Two hypotheses were eliminated for confidence scores below the 0.35 threshold.',
     caveats: [
       'Limited access to classified primary sources',
       'Historical accounts may contain factual inaccuracies',
       'Correlation does not imply causation in pattern analysis',
     ],
-    summary:
-      'After systematic analysis of all available evidence, the investigation concludes that the Government Cover-Up hypothesis (H-001) presents the strongest evidence-backed explanation. Declassified documents and verified witness testimony provide substantial corroboration, while competing hypotheses lacked sufficient evidentiary support to survive rigorous scoring. Two hypotheses were eliminated for confidence scores below the 0.35 threshold.',
-    all_sources: [
-      'https://en.wikipedia.org/wiki/example',
-      'https://www.nature.com/articles/example',
-      'https://www.history.com/example',
-      'https://arxiv.org/abs/example',
+    sources: [
+      'en.wikipedia.org',
+      'nature.com',
+      'history.com',
+      'arxiv.org',
     ],
+    confidence: 0.72,
   };
 }
 
@@ -260,17 +245,30 @@ class CircularBuffer<T> {
 
 const INITIAL_STATE: InvestigationState = {
   stage: 'idle',
+  query: '',
   hypotheses: [],
-  terminalLogs: [],
+  logs: [],
   verdict: null,
+  counters: { hypotheses: 0, evidence: 0, sources: 0 },
+  startedAt: null,
   isConnected: false,
-  error: null,
 };
+
+function createLogEntry(message: string, isError = false, isWarn = false, isSuccess = false): LogEntry {
+  const now = new Date();
+  const timeStr = `[${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}]`;
+  let level: LogEntry['level'] = 'info';
+  if (isError) level = 'error';
+  else if (isWarn) level = 'warn';
+  else if (isSuccess) level = 'success';
+
+  return { timestamp: timeStr, message, level };
+}
 
 export function useInvestigation() {
   const [state, setState] = useState<InvestigationState>(INITIAL_STATE);
   const wsRef = useRef<WebSocket | null>(null);
-  const logsBuffer = useRef(new CircularBuffer<string>(200));
+  const logsBuffer = useRef(new CircularBuffer<LogEntry>(200));
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mockTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -278,11 +276,17 @@ export function useInvestigation() {
   const isMockMode = import.meta.env.VITE_MOCK === 'true';
 
   /* Push log lines and update state */
-  const addLogs = useCallback((lines: string[]) => {
-    logsBuffer.current.pushMany(lines);
+  const addLogs = useCallback((messages: string[], level: LogEntry['level'] = 'info') => {
+    const entries = messages.map(msg => createLogEntry(
+      msg, 
+      level === 'error' || msg.includes('ERROR') || msg.includes('✗'),
+      level === 'warn',
+      level === 'success' || msg.includes('✓') || msg.includes('COMPLETE') || msg.includes('SURVIVING') || msg.includes('HIT')
+    ));
+    logsBuffer.current.pushMany(entries);
     setState((prev) => ({
       ...prev,
-      terminalLogs: logsBuffer.current.getAll(),
+      logs: logsBuffer.current.getAll(),
     }));
   }, []);
 
@@ -299,14 +303,14 @@ export function useInvestigation() {
               `> INVESTIGATION INITIATED: ${data.mystery as string}`,
               '> CONNECTING TO NEURAL NETWORK...',
             ]);
-            setState((prev) => ({ ...prev, stage: 'scanning' }));
+            setState((prev) => ({ ...prev, stage: 'scanning', query: data.mystery as string, startedAt: new Date() }));
             break;
 
           case 'node_complete': {
             const nodeName = data.node as string;
             const nodeData = data.data as Record<string, unknown>;
 
-            addLogs([`> NODE COMPLETE: ${nodeName.toUpperCase()}`]);
+            addLogs([`> NODE COMPLETE: ${nodeName.toUpperCase()}`], 'success');
 
             setState((prev) => {
               const newStage = NODE_TO_STAGE[nodeName] ?? prev.stage;
@@ -318,55 +322,71 @@ export function useInvestigation() {
                 ).map((h) => ({
                   id: h.id as string,
                   title: h.title as string,
-                  description: h.description as string,
-                  plausibility_score: h.plausibility_score as number,
-                  status: (h.status as Hypothesis['status']) ?? 'active',
-                  elimination_reason: h.elimination_reason as string | null,
+                  body: h.description as string,
+                  confidence: h.plausibility_score as number,
+                  status: (h.status === 'surviving' ? 'survivor' : h.status ?? 'active') as HypothesisStatus,
+                  eliminationReason: h.elimination_reason as string | undefined,
                   evidence: [],
                 }));
+                updated.counters = { ...updated.counters, hypotheses: updated.hypotheses.length };
               }
 
-              if (
-                nodeName === 'retrieve_evidence' &&
-                nodeData.evidence
-              ) {
-                const evidenceMap = nodeData.evidence as Record<string, Evidence[]>;
-                updated.hypotheses = prev.hypotheses.map((h) => ({
-                  ...h,
-                  evidence: evidenceMap[h.id] ?? h.evidence,
-                }));
+              if (nodeName === 'retrieve_evidence' && nodeData.evidence) {
+                const evidenceMap = nodeData.evidence as Record<string, Array<Record<string, unknown>>>;
+                let evidenceCount = 0;
+                const sourceDomains = new Set<string>();
+
+                updated.hypotheses = prev.hypotheses.map((h) => {
+                  const rawEvs = evidenceMap[h.id] || [];
+                  const newEvs = rawEvs.map(e => {
+                    evidenceCount++;
+                    if (e.source_domain) sourceDomains.add(e.source_domain as string);
+                    return {
+                      id: e.id as string,
+                      url: e.source_url as string,
+                      title: e.source_name as string,
+                      excerpt: e.text as string,
+                      domain: (e.source_domain || e.domain_tag) as string,
+                      favicon: e.favicon as string | undefined
+                    };
+                  });
+                  return {
+                    ...h,
+                    evidence: newEvs,
+                  };
+                });
+                updated.counters = { ...updated.counters, evidence: evidenceCount, sources: sourceDomains.size };
               }
 
-              if (
-                nodeName === 'score_and_eliminate' &&
-                nodeData.hypotheses
-              ) {
-                const scoredHypotheses =
-                  nodeData.hypotheses as Array<Record<string, unknown>>;
+              if (nodeName === 'score_and_eliminate' && nodeData.hypotheses) {
+                const scoredHypotheses = nodeData.hypotheses as Array<Record<string, unknown>>;
                 const scoredMap = new Map(
-                  (
-                    (nodeData.scored_hypotheses as Array<Record<string, unknown>>) ??
-                    []
-                  ).map((sh) => [sh.hypothesis_id as string, sh.confidence_score as number])
+                  ((nodeData.scored_hypotheses as Array<Record<string, unknown>>) ?? []).map((sh) => [sh.hypothesis_id as string, sh.confidence_score as number])
                 );
 
                 updated.hypotheses = prev.hypotheses.map((h) => {
-                  const scored = scoredHypotheses.find(
-                    (sh) => sh.id === h.id
-                  );
+                  const scored = scoredHypotheses.find((sh) => sh.id === h.id);
+                  let newStatus = (scored?.status as string) ?? h.status;
+                  if (newStatus === 'surviving') newStatus = 'survivor';
+
                   return {
                     ...h,
-                    status: (scored?.status as Hypothesis['status']) ?? h.status,
-                    elimination_reason:
-                      (scored?.elimination_reason as string) ??
-                      h.elimination_reason,
+                    status: newStatus as HypothesisStatus,
+                    eliminationReason: (scored?.elimination_reason as string) ?? h.eliminationReason,
                     confidence: scoredMap.get(h.id) ?? h.confidence,
                   };
                 });
               }
 
               if (nodeName === 'conclude' && nodeData.conclusion) {
-                updated.verdict = nodeData.conclusion as Conclusion;
+                const rawCon = nodeData.conclusion as Record<string, unknown>;
+                updated.verdict = {
+                  status: rawCon.confidence_label === 'High' ? 'CASE RESOLVED' : 'INCONCLUSIVE',
+                  narrative: rawCon.summary as string,
+                  caveats: rawCon.caveats as string[],
+                  sources: rawCon.all_sources as string[],
+                  confidence: rawCon.overall_confidence as number,
+                };
               }
 
               return updated;
@@ -379,15 +399,15 @@ export function useInvestigation() {
               `> ✗ HYPOTHESIS ${data.hypothesis_id as string} ELIMINATED`,
               `>   REASON: ${data.reason as string}`,
               `>   CONFIDENCE: ${data.confidence_score as number}`,
-            ]);
+            ], 'warn');
             break;
 
           case 'investigation_complete':
-            addLogs(['> ═══════════════════════════════', '> INVESTIGATION COMPLETE', '> ═══════════════════════════════']);
+            addLogs(['> ═══════════════════════════════', '> INVESTIGATION COMPLETE', '> ═══════════════════════════════'], 'success');
             break;
 
           case 'error':
-            addLogs([`> ✗ ERROR: ${data.message as string}`]);
+            addLogs([`> ✗ ERROR: ${data.message as string}`], 'error');
             setState((prev) => ({
               ...prev,
               error: data.message as string,
@@ -395,7 +415,7 @@ export function useInvestigation() {
             break;
         }
       } catch {
-        addLogs(['> ✗ FAILED TO PARSE SERVER MESSAGE']);
+        addLogs(['> ✗ FAILED TO PARSE SERVER MESSAGE'], 'error');
       }
     },
     [addLogs]
@@ -409,7 +429,7 @@ export function useInvestigation() {
     const ws = new WebSocket(`ws://${wsUrl}/ws/investigate`);
 
     ws.onopen = () => {
-      setState((prev) => ({ ...prev, isConnected: true, error: null }));
+      setState((prev) => ({ ...prev, isConnected: true }));
       reconnectAttempts.current = 0;
       addLogs(['> WEBSOCKET CONNECTED']);
     };
@@ -418,37 +438,33 @@ export function useInvestigation() {
 
     ws.onclose = () => {
       setState((prev) => ({ ...prev, isConnected: false }));
-      addLogs(['> WEBSOCKET DISCONNECTED']);
+      addLogs(['> WEBSOCKET DISCONNECTED'], 'warn');
 
-      // Exponential backoff reconnect
-      const delay = Math.min(
-        1000 * Math.pow(2, reconnectAttempts.current),
-        30000
-      );
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
       reconnectAttempts.current++;
       reconnectTimer.current = setTimeout(connect, delay);
     };
 
     ws.onerror = () => {
-      addLogs(['> ✗ WEBSOCKET ERROR']);
+      addLogs(['> ✗ WEBSOCKET ERROR'], 'error');
     };
 
     wsRef.current = ws;
   }, [isMockMode, handleMessage, addLogs]);
 
-  /* Start investigation — real or mock */
+  /* Start investigation */
   const startInvestigation = useCallback(
     (query: string) => {
-      // Reset state
       logsBuffer.current.clear();
-      setState({
+      setState(prev => ({
         ...INITIAL_STATE,
-        isConnected: isMockMode || state.isConnected,
-        terminalLogs: [],
-      });
+        isConnected: isMockMode || prev.isConnected,
+        query,
+        startedAt: new Date(),
+        logs: [],
+      }));
 
       if (isMockMode) {
-        // ── Mock Mode: simulate the pipeline ──
         addLogs([
           `> INVESTIGATION INITIATED: ${query}`,
           '> [MOCK MODE] SIMULATING PIPELINE...',
@@ -473,46 +489,38 @@ export function useInvestigation() {
                   updated.hypotheses = MOCK_HYPOTHESES.map((h) => ({
                     ...h,
                     status: 'active' as const,
+                    confidence: 0.5,
                   }));
+                  updated.counters = { ...updated.counters, hypotheses: MOCK_HYPOTHESES.length };
                 }
 
                 if (node === 'retrieve_evidence') {
-                  updated.hypotheses = prev.hypotheses.map((h) => ({
-                    ...h,
-                    evidence: MOCK_EVIDENCE.filter(
-                      (e) => e.hypothesis_id === h.id
-                    ),
-                  }));
+                  const evMap: Record<string, Evidence[]> = {
+                    hyp_001: [MOCK_EVIDENCE[0], MOCK_EVIDENCE[1]],
+                    hyp_002: [MOCK_EVIDENCE[1]],
+                    hyp_003: [MOCK_EVIDENCE[2]],
+                    hyp_004: [MOCK_EVIDENCE[3]],
+                  };
+                  let evTotal = 0;
+                  updated.hypotheses = prev.hypotheses.map((h) => {
+                    evTotal += (evMap[h.id]?.length || 0);
+                    return {
+                      ...h,
+                      evidence: evMap[h.id] || [],
+                    };
+                  });
+                  updated.counters = { ...updated.counters, evidence: evTotal, sources: 4 };
                 }
 
                 if (node === 'score_and_eliminate') {
                   updated.hypotheses = prev.hypotheses.map((h) => {
                     if (h.id === 'hyp_003') {
-                      return {
-                        ...h,
-                        status: 'eliminated' as const,
-                        confidence: 0.28,
-                        elimination_reason:
-                          'Insufficient evidence to support mass hysteria as primary explanation',
-                      };
+                      return { ...h, status: 'eliminated' as const, confidence: 0.28, eliminationReason: 'Insufficient evidence to support mass hysteria as primary explanation' };
                     }
                     if (h.id === 'hyp_004') {
-                      return {
-                        ...h,
-                        status: 'eliminated' as const,
-                        confidence: 0.31,
-                        elimination_reason:
-                          'No verifiable physical evidence of unknown technology',
-                      };
+                      return { ...h, status: 'eliminated' as const, confidence: 0.31, eliminationReason: 'No verifiable physical evidence of unknown technology' };
                     }
-                    return {
-                      ...h,
-                      status: 'surviving' as const,
-                      confidence:
-                        h.id === 'hyp_001'
-                          ? 0.72
-                          : 0.58,
-                    };
+                    return { ...h, status: 'survivor' as const, confidence: h.id === 'hyp_001' ? 0.72 : 0.58 };
                   });
                 }
 
@@ -530,21 +538,16 @@ export function useInvestigation() {
           mockTimers.current.push(timer);
         });
       } else {
-        // ── Real Mode: send via WebSocket ──
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ mystery: query }));
         } else {
-          setState((prev) => ({
-            ...prev,
-            error: 'WebSocket not connected',
-          }));
+          addLogs(['> ✗ WEBSOCKET NOT CONNECTED'], 'error');
         }
       }
     },
-    [isMockMode, state.isConnected, addLogs]
+    [isMockMode, addLogs]
   );
 
-  /* Reset */
   const resetInvestigation = useCallback(() => {
     logsBuffer.current.clear();
     mockTimers.current.forEach(clearTimeout);
@@ -555,7 +558,6 @@ export function useInvestigation() {
     });
   }, [isMockMode]);
 
-  /* Connect on mount (real mode only) */
   useEffect(() => {
     if (!isMockMode) {
       connect();

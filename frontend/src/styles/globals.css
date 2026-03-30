@@ -1,252 +1,109 @@
 @import "tailwindcss";
 
-/* ============================================================
-   SHADOWMIND — CYBER-NOIR DESIGN SYSTEM
-   ============================================================ */
-
 @theme {
-  /* ── Color Tokens ── */
-  --color-dark-matter: #060010;
-  --color-dark-surface: #0A0015;
-  --color-dark-elevated: #0F001F;
-  --color-dark-glass: rgba(6, 0, 16, 0.75);
+  /* Base */
+  --color-void: #060010;
+  --color-void-soft: #0A0018;
+  --color-void-muted: #0F0020;
+  --color-surface: #100820;
+  --color-surface-raised: #160B2C;
+  --color-surface-float: #1C1035;
 
-  --color-electric-cyan: #00F5FF;
-  --color-toxic-violet: #8B00FF;
-  --color-crimson-burn: #FF1744;
-  --color-ghost-white: #E8E8F0;
-  --color-ghost-dim: rgba(232, 232, 240, 0.5);
-  --color-ghost-faint: rgba(232, 232, 240, 0.15);
+  /* Primary Accents */
+  --color-cyan: #00F5FF;
+  --color-cyan-dim: rgba(0, 245, 255, 0.4);
+  --color-cyan-ghost: rgba(0, 245, 255, 0.08);
+  --color-violet: #8B00FF;
+  --color-violet-dim: rgba(139, 0, 255, 0.4);
+  --color-violet-ghost: rgba(139, 0, 255, 0.08);
+  --color-crimson: #FF1744;
+  --color-crimson-dim: rgba(255, 23, 68, 0.4);
+  --color-amber: #FFB300;
+  --color-green: #00FF88;
 
-  --color-cyan-glow: rgba(0, 245, 255, 0.3);
-  --color-violet-glow: rgba(139, 0, 255, 0.3);
-  --color-crimson-glow: rgba(255, 23, 68, 0.3);
+  /* Text */
+  --color-text-primary: #E8E8F0;
+  --color-text-secondary: rgba(232, 232, 240, 0.6);
+  --color-text-muted: rgba(112, 112, 160, 0.7);
+  --color-text-disabled: rgba(112, 112, 160, 0.3);
 
-  --color-border-glass: rgba(255, 255, 255, 0.08);
-  --color-border-cyan: rgba(0, 245, 255, 0.3);
-  --color-border-violet: rgba(139, 0, 255, 0.3);
-  --color-border-crimson: rgba(255, 23, 68, 0.4);
+  /* Fonts */
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Syne', sans-serif;
 
-  /* ── Typography ── */
-  --font-display: "Bebas Neue", "Impact", sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
-  --font-ui: "Syne", "Inter", sans-serif;
-
-  /* ── Spacing ── */
-  --spacing-sidebar: 280px;
-
-  /* ── Animations ── */
-  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
-  --animate-pulse-ring: pulse-ring 1.5s ease-in-out infinite;
-  --animate-scanline: scanline-sweep 2s linear infinite;
-  --animate-glitch: glitch-entry 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-  --animate-typewriter: typewriter-blink 1s step-end infinite;
-  --animate-gradient-line: gradient-sweep 3s linear infinite;
-  --animate-data-packet: data-travel 2s linear infinite;
-  --animate-burn: burn-decay 1.5s ease-out both;
-  --animate-float: float-drift 6s ease-in-out infinite;
-  --animate-scanline-red: scanline-red-sweep 2s ease-out forwards;
+  /* Sizes — never go below these floors */
+  --text-hero: clamp(72px, 11vw, 140px);
+  --text-section: clamp(32px, 4vw, 56px);
+  --text-card-title: clamp(22px, 2.5vw, 32px);
+  --text-body: 15px;
+  --text-label: 13px;
+  --text-micro: 12px; /* ABSOLUTE FLOOR */
 }
 
-/* ============================================================
-   CUSTOM KEYFRAMES
-   ============================================================ */
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-@keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(0, 245, 255, 0.5); }
-  70% { box-shadow: 0 0 0 8px rgba(0, 245, 255, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 245, 255, 0); }
-}
+/* ── Custom Keyframes ── */
 
 @keyframes scanline-sweep {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
+  0%   { transform: translateY(-100%); opacity: 0; }
+  20%  { opacity: 0.6; }
+  100% { transform: translateY(400%); opacity: 0; }
+}
+
+@keyframes scanline-red {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  20%  { opacity: 0.4; }
+  100% { transform: translateY(400%); opacity: 0; }
 }
 
 @keyframes glitch-entry {
-  0% { transform: translateX(-8px); opacity: 0; filter: blur(4px); }
-  20% { transform: translateX(6px); opacity: 0.8; }
-  40% { transform: translateX(-4px); opacity: 1; }
-  60% { transform: translateX(2px); }
-  80% { transform: translateX(-1px); }
-  100% { transform: translateX(0); opacity: 1; filter: blur(0); }
-}
-
-@keyframes gradient-sweep {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0%   { transform: translateX(-6px); opacity: 0; }
+  15%  { transform: translateX(4px);  opacity: 1; }
+  30%  { transform: translateX(-3px); }
+  45%  { transform: translateX(2px); }
+  60%  { transform: translateX(-1px); }
+  75%  { transform: translateX(0.5px); }
+  100% { transform: translateX(0); }
 }
 
 @keyframes typewriter-blink {
-  0%, 100% { border-color: var(--color-electric-cyan); }
-  50% { border-color: transparent; }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(0,245,255,0.4); }
+  70%  { box-shadow: 0 0 0 8px rgba(0,245,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,245,255,0); }
 }
 
 @keyframes data-travel {
-  0% { offset-distance: 0%; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { offset-distance: 100%; opacity: 0; }
+  0%   { stroke-dashoffset: 300; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
 }
 
-@keyframes burn-decay {
-  0% { filter: saturate(1) brightness(1); }
-  50% { filter: saturate(0.3) brightness(0.7); border-color: var(--color-crimson-burn); }
-  100% { filter: saturate(0.1) brightness(0.5); transform: scale(0.98); }
+@keyframes float-bar {
+  0%, 100% { height: 30%; }
+  50%       { height: 90%; }
 }
 
-@keyframes float-drift {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+@keyframes draw-line {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes card-materialize {
+  0%   { transform: translateY(-16px) scale(0.98); opacity: 0; filter: blur(4px); }
+  100% { transform: translateY(0) scale(1);  opacity: 1; filter: blur(0); }
 }
 
-@keyframes confidence-fill {
-  0% { width: 0%; }
-  100% { width: var(--confidence); }
-}
+/* Global cursor upgrade */
+* { cursor: crosshair; }
+a, button { cursor: crosshair; }
 
-@keyframes verdict-reveal {
-  0% { clip-path: inset(100% 0 0 0); }
-  100% { clip-path: inset(0 0 0 0); }
-}
-
-@keyframes signal-decay {
-  0% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.95); }
-}
-
-@keyframes scanline-red-sweep {
-  0% { transform: translateY(-100%); background: linear-gradient(to bottom, transparent, rgba(255, 23, 68, 0.4), transparent); }
-  100% { transform: translateY(200%); background: linear-gradient(to bottom, transparent, rgba(255, 23, 68, 0.4), transparent); }
-}
-
-/* ============================================================
-   BASE STYLES
-   ============================================================ */
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  font-family: var(--font-ui);
-  background: var(--color-dark-matter);
-  color: var(--color-ghost-white);
-  overflow-x: hidden;
-  min-height: 100vh;
-}
-
-#root {
-  min-height: 100vh;
-}
-
-/* ============================================================
-   GLASS SURFACES
-   ============================================================ */
-
-.glass-surface {
-  background: var(--color-dark-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--color-border-glass);
-}
-
-.glass-surface-elevated {
-  background: rgba(10, 0, 21, 0.85);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid var(--color-border-glass);
-}
-
-/* ============================================================
-   SCROLLBAR STYLING
-   ============================================================ */
-
-::-webkit-scrollbar {
-  width: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 245, 255, 0.15);
-  border-radius: 2px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 245, 255, 0.3);
-}
-
-/* ============================================================
-   SELECTION
-   ============================================================ */
-
-::selection {
-  background: rgba(139, 0, 255, 0.4);
-  color: var(--color-ghost-white);
-}
-
-/* ============================================================
-   UTILITY CLASSES
-   ============================================================ */
-
-.text-chromatic {
-  text-shadow:
-    -2px 0 var(--color-crimson-burn),
-    2px 0 var(--color-electric-cyan),
-    0 0 40px rgba(0, 245, 255, 0.6),
-    0 0 80px rgba(139, 0, 255, 0.3);
-}
-
-.border-glow-cyan {
-  border-color: rgba(0, 245, 255, 0.3);
-  box-shadow: 0 0 15px rgba(0, 245, 255, 0.1), inset 0 0 15px rgba(0, 245, 255, 0.05);
-}
-
-.border-glow-violet {
-  border-color: rgba(139, 0, 255, 0.3);
-  box-shadow: 0 0 15px rgba(139, 0, 255, 0.1), inset 0 0 15px rgba(139, 0, 255, 0.05);
-}
-
-.border-glow-crimson {
-  border-color: rgba(255, 23, 68, 0.4);
-  box-shadow: 0 0 20px rgba(255, 23, 68, 0.2), inset 0 0 10px rgba(255, 23, 68, 0.1);
-}
-
-.gradient-line {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--color-electric-cyan), transparent);
-  background-size: 200% 100%;
-  animation: gradient-sweep 3s linear infinite;
-}
-
-.skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(232, 232, 240, 0.03) 25%,
-    rgba(232, 232, 240, 0.08) 50%,
-    rgba(232, 232, 240, 0.03) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
+/* Custom scrollbar — entire app */
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: var(--color-void); }
+::-webkit-scrollbar-thumb { background: var(--color-cyan-dim); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-cyan); }

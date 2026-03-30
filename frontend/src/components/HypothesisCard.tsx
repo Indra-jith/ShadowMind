@@ -1,174 +1,273 @@
-import { motion } from 'framer-motion';
-import type { Hypothesis } from '@/hooks/useInvestigation';
-import type { PipelineStage } from '@/hooks/useInvestigation';
-import { cn, formatConfidence } from '@/lib/utils';
-import { ExternalLink, ShieldCheck, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BrainCircuit, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Hypothesis } from '../hooks/useInvestigation';
 
 interface HypothesisCardProps {
   hypothesis: Hypothesis;
   index: number;
-  currentStage: PipelineStage;
 }
 
-export default function HypothesisCard({
-  hypothesis,
-  index,
-  currentStage,
-}: HypothesisCardProps) {
-  const isComplete = ['scoring', 'concluded'].includes(currentStage);
-  const confidenceValue = hypothesis.confidence ?? hypothesis.plausibility_score;
-  const isDemoted = isComplete && confidenceValue < 0.35;
-  const isSurvivor = isComplete && confidenceValue >= 0.35;
+export default function HypothesisCard({ hypothesis, index }: HypothesisCardProps) {
+  const { status, confidence, eliminationReason, title, body, evidence } = hypothesis;
+  const isEliminated = status === 'eliminated';
+  const isSurvivor = status === 'survivor';
+  const isActive = status === 'active';
   
-  const displayId = hypothesis.id.replace('hyp_', 'H-').toUpperCase();
+  // Theme lookups
+  const getAccentConfig = () => {
+    switch(status) {
+      case 'pending': return { bg: 'rgba(112,112,160,0.3)', shadow: 'none' };
+      case 'active': return { bg: '#00F5FF', shadow: '0 0 20px rgba(0,245,255,0.8)' };
+      case 'survivor': return { bg: '#8B00FF', shadow: '0 0 20px rgba(139,0,255,0.6)' };
+      case 'eliminated': return { bg: '#FF1744', shadow: '0 0 16px rgba(255,23,68,0.4)' };
+      default: return { bg: 'transparent', shadow: 'none' };
+    }
+  };
+  const accent = getAccentConfig();
 
-  const getBorderColor = () => {
-    if (isDemoted) return 'rgba(255, 23, 68, 1)';
-    if (isSurvivor) return 'rgba(139, 0, 255, 1)';
-    return 'rgba(0, 245, 255, 1)';
+  const getConfColor = (conf: number) => {
+    if (conf >= 0.75) return '#00FF88';
+    if (conf >= 0.50) return '#00F5FF';
+    if (conf >= 0.35) return '#FFB300';
+    return '#FF1744';
+  };
+  const confColor = getConfColor(confidence || 0);
+
+  const getConfGradient = (conf: number) => {
+    if (conf < 0.35) return 'linear-gradient(90deg, #FF1744, rgba(255,23,68,0.3))';
+    if (conf < 0.75) return 'linear-gradient(90deg, #FFB300, #00F5FF)';
+    return 'linear-gradient(90deg, #00F5FF, #8B00FF)';
   };
 
-  const getBoxShadow = () => {
-    if (isSurvivor) return '0 0 40px rgba(139, 0, 255, 0.3)';
-    if (isDemoted) return 'none'; // demoted cards have no outer glow
-    return '0 0 20px rgba(0, 245, 255, 0.1)';
+  const getStatusBadge = () => {
+    if (isSurvivor) return { text: 'SUSTAINED', color: '#8B00FF', bg: 'rgba(139,0,255,0.1)', border: '1px solid rgba(139,0,255,0.3)' };
+    if (isEliminated) return { text: 'ELIMINATED', color: '#FF1744', bg: 'rgba(255,23,68,0.1)', border: '1px solid rgba(255,23,68,0.3)' };
+    if (isActive) return { text: 'ANALYZING', color: '#00F5FF', bg: 'rgba(0,245,255,0.1)', border: '1px solid rgba(0,245,255,0.3)' };
+    return { text: 'PENDING', color: 'rgba(112,112,160,0.6)', bg: 'transparent', border: '1px solid rgba(112,112,160,0.3)' };
   };
-
-  // Gradient based on score: Crimson (0%) -> Amber (50%) -> Cyan (75%) -> Violet (100%)
-  const meterGradient = 'linear-gradient(90deg, #FF1744 0%, #FFB300 50%, #00F5FF 75%, #8B00FF 100%)';
+  const badge = getStatusBadge();
 
   return (
-    <motion.div
-      layout
-      transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        "relative flex flex-col w-full min-h-[280px] p-8 rounded-sm transition-all duration-700 overflow-hidden group border",
-        isDemoted ? "grayscale-[80%] opacity-60 border-crimson-burn/30 animate-scanline-red" : "border-electric-cyan/20"
-      )}
+    <div 
+      className="relative w-full min-h-[320px] rounded-[8px] overflow-hidden"
       style={{
-        background: 'linear-gradient(135deg, rgba(10,2,28,0.95), rgba(20,5,45,0.9))',
-        borderLeft: `4px solid ${getBorderColor()}`,
-        boxShadow: getBoxShadow(),
+        background: 'linear-gradient(135deg, rgba(16,8,32,0.97) 0%, rgba(22,11,44,0.95) 100%)',
+        border: isSurvivor ? '1px solid rgba(139,0,255,0.25)' : '1px solid rgba(0,245,255,0.1)',
+        boxShadow: isSurvivor ? '0 0 40px rgba(139,0,255,0.15), 0 8px 32px rgba(139,0,255,0.08)' : 'none',
+        filter: isEliminated ? 'grayscale(0.8)' : 'blur(0)',
+        opacity: isEliminated ? 0.65 : 1,
+        transition: 'filter 1s ease, opacity 0.8s ease',
+        animation: `card-materialize 0.6s cubic-bezier(0.22, 1, 0.36, 1) ${index * 0.12}s forwards`
       }}
-      whileHover={!isDemoted ? { y: -4, borderColor: 'rgba(0,245,255,0.5)' } : {}}
     >
-      {/* ── Top Bar ── */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-[14px] text-electric-cyan font-bold tracking-widest">{displayId}</span>
-          {isSurvivor && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-toxic-violet/10 border border-toxic-violet/30 text-toxic-violet font-mono text-[11px] tracking-widest uppercase rounded-sm shadow-[0_0_10px_rgba(139,0,255,0.2)]">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              HYPOTHESIS SUSTAINED
-            </span>
-          )}
-          {isDemoted && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-crimson-burn/10 border border-crimson-burn/30 text-crimson-burn font-mono text-[11px] tracking-widest uppercase rounded-sm">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              LOW CONFIDENCE
-            </span>
-          )}
-        </div>
-        
-        {/* We place the confidence at the end of the top bar just as a visual balance, or can omit it and use the massive bar */}
-        <span className="font-mono text-[12px] text-[#B0B0C8] tracking-widest">
-           CONFIDENCE: {formatConfidence(confidenceValue)}
-        </span>
-      </div>
+      {/* Accent Bar */}
+      <div 
+        className="absolute left-0 top-0 h-full w-[4px]"
+        style={{
+          backgroundColor: accent.bg,
+          boxShadow: accent.shadow,
+          transition: 'all 0.4s ease'
+        }}
+      />
 
-      {/* ── Title & Description ── */}
-      <h2 className="font-display text-[32px] tracking-[0.05em] text-white leading-none mb-3">
-        {hypothesis.title}
-      </h2>
-      <p className="font-ui text-[15px] text-ghost-dim leading-relaxed max-w-[800px] mb-8">
-        {hypothesis.description}
-      </p>
-
-      {/* ── Evidence Row ── */}
-      {hypothesis.evidence && hypothesis.evidence.length > 0 && (
-        <div className="mb-8 overflow-hidden">
-          <div className="flex items-center gap-2 mb-3">
-            <h4 className="font-mono text-[12px] tracking-[0.2em] text-[#B0B0C8]">EVIDENCE TRAIL</h4>
-            <div className="h-px flex-1 bg-gradient-to-r from-border-glass to-transparent" />
-          </div>
-          
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-electric-cyan/20 scrollbar-track-transparent">
-            {hypothesis.evidence.map((ev, i) => {
-              let domain = 'source';
-              try { domain = new URL(ev.source_url).hostname.replace('www.', ''); } catch { }
-              
-              return (
-                <div key={`${ev.id || i}`} className="flex-shrink-0 w-[240px] flex flex-col p-4 border border-electric-cyan/15 bg-electric-cyan/[0.02] rounded-sm hover:border-electric-cyan/40 transition-colors">
-                  <div className="flex gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-sm bg-dark-matter flex items-center justify-center border border-border-glass shrink-0 text-[10px] text-electric-cyan font-mono overflow-hidden">
-                       🌐
-                    </div>
-                    <div className="flex flex-col overflow-hidden">
-                      <span className="font-ui text-[13px] font-bold text-white truncate">{ev.text.slice(0, 30)}...</span>
-                      <span className="font-mono text-[10px] text-electric-cyan/70 truncate">{domain}</span>
-                    </div>
-                  </div>
-                  
-                  <p className="font-ui text-[11px] text-ghost-dim/60 line-clamp-2 mt-auto mb-3">
-                    "{ev.text}"
-                  </p>
-
-                  <a 
-                    href={ev.source_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 w-full py-1.5 bg-electric-cyan/5 border border-electric-cyan/20 text-electric-cyan font-mono text-[11px] font-bold uppercase tracking-wider hover:bg-electric-cyan/15 transition-colors mt-auto"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    VISIT
-                  </a>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Elimination Reason Block ── */}
-      {isDemoted && hypothesis.elimination_reason && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="mb-8 p-5 border-l-4 border-crimson-burn/80 bg-gradient-to-r from-crimson-burn/[0.08] to-transparent relative overflow-hidden"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 text-crimson-burn animate-pulse" />
-            <h4 className="font-mono text-[12px] tracking-[0.2em] text-crimson-burn font-bold shadow-crimson-burn/20 drop-shadow-md">
-              LLM ELIMINATION REASONING
-            </h4>
-          </div>
-          <p className="font-mono text-[13px] text-white/80 leading-relaxed font-semibold">
-            {hypothesis.elimination_reason}
-          </p>
-        </motion.div>
-      )}
-
-      {/* ── Confidence Meter Section ── */}
-      <div className="mt-auto">
-        <div className="flex items-end justify-between mb-2">
-          <span className="font-mono text-[12px] tracking-[0.2em] text-[#B0B0C8] mb-1">CONFIDENCE METER</span>
-          <span className="font-display text-[72px] leading-none text-white">{formatConfidence(confidenceValue)}</span>
-        </div>
-        
-        <div className="h-4 bg-dark-matter border border-border-glass rounded-full overflow-hidden">
-          <motion.div 
-            className="h-full rounded-full"
-            style={{ backgroundImage: meterGradient }}
-            initial={{ width: '0%' }}
-            animate={{ width: `${confidenceValue * 100}%` }}
-            transition={{ duration: 1.2, ease: 'easeOut', delay: index * 0.1 }}
+      {/* OVERLAYS FOR ELIMINATED */}
+      {isEliminated && (
+        <>
+          <div 
+            className="pointer-events-none absolute inset-0 z-10"
+            style={{
+              background: 'linear-gradient(transparent, rgba(255,23,68,0.06), transparent)',
+              height: '40%',
+              animation: 'scanline-red 1.5s ease forwards'
+            }}
           />
+          <div 
+            className="pointer-events-none absolute inset-0 z-10"
+            style={{
+              background: 'repeating-linear-gradient(180deg, transparent, transparent 4px, rgba(255,23,68,0.02) 4px, rgba(255,23,68,0.02) 8px)'
+            }}
+          />
+        </>
+      )}
+
+      {/* CARD HEADER ROW */}
+      <div className="flex justify-between items-start pt-[24px] pb-[16px] pl-[32px] pr-[28px]">
+        {/* Left Header */}
+        <div>
+          <div 
+            className="inline-block rounded-[3px] border border-[rgba(0,245,255,0.15)] bg-[rgba(0,245,255,0.06)] px-[8px] py-[3px] text-[11px] tracking-[0.2em] text-[rgba(0,245,255,0.6)]"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            H-00{index + 1}
+          </div>
+          <h2 
+            className="mt-[10px] max-w-[600px] text-[#E8E8F0] tracking-[0.02em] leading-none"
+            style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(24px, 3vw, 36px)' }}
+          >
+            {title}
+          </h2>
+        </div>
+
+        {/* Right Header: Confidence */}
+        <div className="flex flex-col items-end">
+          <div className="flex items-center gap-3">
+            {isSurvivor && (
+              <div 
+                className="flex items-center gap-1.5 px-[10px] py-[4px] rounded-[3px]"
+                style={{ background: badge.bg, border: badge.border, color: badge.color, fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.15em' }}
+              >
+                <ShieldCheck className="w-[12px] h-[12px]" />
+                HYPOTHESIS SUSTAINED
+              </div>
+            )}
+            {!isSurvivor && (
+              <div 
+                className="px-[10px] py-[4px] rounded-[3px]"
+                style={{ background: badge.bg, border: badge.border, color: badge.color, fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.15em' }}
+              >
+                {badge.text}
+              </div>
+            )}
+          </div>
+          <div className="mt-2 flex items-baseline">
+            <span 
+              className="leading-none transition-colors duration-[1.4s]"
+              style={{ fontFamily: 'var(--font-display)', fontSize: '64px', color: confColor }}
+            >
+              {Math.round(confidence * 100)}
+            </span>
+            <span 
+              className="leading-none transition-colors duration-[1.4s]"
+              style={{ fontFamily: 'var(--font-display)', fontSize: '36px', color: confColor, opacity: 0.5 }}
+            >
+              %
+            </span>
+          </div>
+          <span 
+            className="-mt-1 text-[10px] tracking-[0.2em] text-[rgba(112,112,160,0.6)]"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            CONFIDENCE
+          </span>
         </div>
       </div>
-      
-    </motion.div>
+
+      {/* CONFIDENCE METER BAR */}
+      <div className="ml-[32px] h-[3px] w-[calc(100%-32px)] rounded-[1.5px] bg-[rgba(255,255,255,0.06)] overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${confidence * 100}%` }}
+          transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+          className="h-full"
+          style={{ background: getConfGradient(confidence) }}
+        />
+      </div>
+
+      {/* ELIMINATION REASON AFTER FAILURE */}
+      <AnimatePresence>
+        {isEliminated && eliminationReason && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            className="overflow-hidden"
+          >
+            <div 
+              className="mt-[16px] mx-[28px] ml-[32px] rounded-[4px] border border-[rgba(255,23,68,0.15)] bg-[rgba(255,23,68,0.04)] p-[16px]"
+            >
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="h-[16px] w-[16px] text-crimson" style={{ color: '#FF1744' }} />
+                <span 
+                  className="text-[11px] tracking-[0.15em] text-[#FF1744]"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                >
+                  LLM ELIMINATION REASONING
+                </span>
+              </div>
+              <p 
+                className="mt-[8px] text-[13px] leading-[1.6] text-[rgba(232,232,240,0.55)]"
+                style={{ fontFamily: 'var(--font-body)' }}
+              >
+                {eliminationReason}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* HYPOTHESIS BODY */}
+      <div 
+        className="pl-[32px] pr-[28px] py-[16px] max-w-[800px] text-[15px] leading-[1.75] text-[rgba(232,232,240,0.75)]"
+        style={{ fontFamily: 'var(--font-body)' }}
+      >
+        {body}
+      </div>
+
+      {/* EVIDENCE TRAIL SECTION */}
+      {evidence && evidence.length > 0 && (
+        <div className="ml-[32px] mt-2 pb-6">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-[12px] px-[28px]">
+            <div className="h-[1px] w-full bg-[rgba(0,245,255,0.12)]" />
+            <span 
+              className="text-[11px] tracking-[0.25em] text-[rgba(0,245,255,0.4)]"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              ─── EVIDENCE TRAIL ──
+            </span>
+            <div className="h-[1px] w-full bg-[rgba(0,245,255,0.12)]" />
+          </div>
+
+          <div 
+            className="mt-4 flex gap-[12px] overflow-x-auto px-[28px] pb-[8px] scroll-smooth"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {evidence.map((ev, i) => (
+              <div
+                key={i}
+                className="group flex w-[220px] flex-shrink-0 flex-col rounded-[6px] border border-[rgba(0,245,255,0.1)] bg-[rgba(0,0,0,0.3)] p-[12px] backdrop-blur-[4px] transition-all duration-200 hover:-translate-y-[2px] hover:border-[rgba(0,245,255,0.3)]"
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {ev.favicon ? (
+                    <img src={ev.favicon} alt="" className="h-4 w-4 rounded-sm" />
+                  ) : (
+                    <span className="text-[16px]">🌐</span>
+                  )}
+                  <span 
+                    className="truncate text-[11px] text-[rgba(0,245,255,0.6)]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  >
+                    {ev.domain}
+                  </span>
+                </div>
+                
+                <p 
+                  className="mb-3 text-[12px] leading-[1.5] text-[rgba(232,232,240,0.6)] flex-1 overflow-hidden"
+                  style={{ 
+                    fontFamily: 'var(--font-body)',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical'
+                  }}
+                >
+                  "{ev.excerpt}"
+                </p>
+
+                <a 
+                  href={ev.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-[4px] text-[11px] tracking-[0.1em] text-[#00F5FF] transition-all hover:drop-shadow-[0_0_8px_rgba(0,245,255,0.6)]"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                >
+                  <ExternalLink className="h-[12px] w-[12px]" />
+                  ↗ OPEN SOURCE
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

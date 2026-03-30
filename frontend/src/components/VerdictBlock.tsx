@@ -1,172 +1,260 @@
-import { motion } from 'framer-motion';
-import type { Conclusion } from '@/hooks/useInvestigation';
-import type { Hypothesis } from '@/hooks/useInvestigation';
-import { formatConfidence } from '@/lib/utils';
-import { FileDown, RotateCcw, ShieldCheck, AlertCircle, ExternalLink } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowUp, Download, RefreshCw } from 'lucide-react';
+import { InvestigationState } from '../hooks/useInvestigation';
 
 interface VerdictBlockProps {
-  verdict: Conclusion;
-  hypotheses: Hypothesis[];
-  onNewInvestigation: () => void;
+  verdict: InvestigationState['verdict'];
+  onReset: () => void;
 }
 
-export default function VerdictBlock({
-  verdict,
-  hypotheses,
-  onNewInvestigation,
-}: VerdictBlockProps) {
-  const survivor = hypotheses.find(
-    (h) => h.id === verdict.surviving_hypothesis
-  );
-  const isResolved = verdict.overall_confidence >= 0.5;
+const CircularProgress: React.FC<{ value: number }> = ({ value }) => {
+  const [offset, setOffset] = useState(300);
+  
+  useEffect(() => {
+    // 300 is our assumed dasharray approx circumference for r=48
+    const toOffset = 300 - (300 * value);
+    const timer = setTimeout(() => setOffset(toOffset), 100);
+    return () => clearTimeout(timer);
+  }, [value]);
 
   return (
-    <motion.div
-      className="relative w-full rounded-sm border-2 overflow-hidden mt-6"
-      style={{
-        background: 'linear-gradient(135deg, #0D0020 0%, #1A0040 100%)',
-        borderColor: '#8B00FF',
-        boxShadow: '0 0 60px rgba(139,0,255,0.4)'
-      }}
-      initial={{ y: 50, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200, duration: 0.8 }}
-    >
-      <div className="flex items-center justify-center p-3 border-b border-toxic-violet/30 bg-toxic-violet/10">
-         <span className="font-mono text-[12px] tracking-[0.2em] text-toxic-violet uppercase font-bold">
-            ══════════════ VERDICT FILED ══════════════
-         </span>
+    <div className="relative flex items-center justify-center">
+      <svg className="w-[120px] h-[120px] transform -rotate-90">
+        <circle 
+          cx="60" cy="60" r="48" 
+          fill="none" 
+          stroke="rgba(255,255,255,0.06)" 
+          strokeWidth="6" 
+        />
+        <circle 
+          cx="60" cy="60" r="48" 
+          fill="none" 
+          stroke="#8B00FF" 
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray="300"
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 1.8s cubic-bezier(0.22, 1, 0.36, 1)' }}
+        />
+      </svg>
+      <div 
+        className="absolute inset-0 flex items-center justify-center text-[#8B00FF]"
+        style={{ fontFamily: 'var(--font-display)', fontSize: '48px', textShadow: '0 0 8px rgba(139,0,255,0.8)' }}
+      >
+        {Math.round(value * 100)}<span className="text-[24px] opacity-50 ml-1">%</span>
       </div>
+    </div>
+  );
+};
 
-      <div className="p-10">
-        {/* ── Verdict Title ── */}
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            {isResolved ? (
-              <ShieldCheck className="w-10 h-10 text-electric-cyan" />
-            ) : (
-              <AlertCircle className="w-10 h-10 text-amber-400" />
-            )}
-            <h2
-              className="font-display text-[64px] tracking-[0.1em] leading-none text-white"
-              style={{
-                textShadow: isResolved ? '0 0 40px rgba(139, 0, 255, 0.8)' : '0 0 40px rgba(255, 167, 38, 0.6)',
-              }}
+export default function VerdictBlock({ verdict, onReset }: VerdictBlockProps) {
+  const [showFab, setShowFab] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Show FAB if scrolled down even a little
+      if (window.scrollY > 200) setShowFab(true);
+      else setShowFab(false);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleExportDossier = () => {
+    if (!verdict) return;
+    const content = `══════════════════════════════════════
+SHADOWMIND INTELLIGENCE DOSSIER
+══════════════════════════════════════
+GENERATED: ${new Date().toLocaleString()}
+
+VERDICT FILED: ${verdict.status || 'INCONCLUSIVE'}
+CONFIDENCE: ${Math.round((verdict.confidence || 0) * 100)}%
+
+--- NEURAL CONCLUSION ---
+${verdict.narrative || 'None'}
+
+--- LIMITATIONS ---
+${verdict.caveats?.map(c => `• ${c}`).join('\n') || 'None'}
+
+--- INTELLIGENCE SOURCES ---
+${verdict.sources?.map(s => `• ${s}`).join('\n') || 'None'}
+`;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shadowmind_dossier_${new Date().getTime()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (!verdict) return null;
+
+  return (
+    <>
+      <div 
+        className="relative mt-[48px] overflow-hidden rounded-[8px] p-[28px] md:p-[48px_40px]"
+        style={{
+          background: 'linear-gradient(135deg, rgba(13,0,32,0.98), rgba(26,0,64,0.95))',
+          border: '2px solid rgba(139,0,255,0.35)',
+          boxShadow: '0 0 80px rgba(139,0,255,0.2), 0 0 160px rgba(139,0,255,0.08), inset 0 0 60px rgba(139,0,255,0.03)'
+        }}
+      >
+        {/* Background Texture & Scanline */}
+        <div 
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: 'repeating-linear-gradient(0deg, transparent, transparent 30px, rgba(139,0,255,0.01) 30px, rgba(139,0,255,0.01) 31px)'
+          }}
+        />
+        <div 
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[rgba(139,0,255,0.2)] to-transparent"
+          style={{ height: '40%', animation: 'scanline-sweep 2s ease forwards' }}
+        />
+
+        {/* TOP LABEL */}
+        <div className="relative flex items-center mb-[16px]">
+          <div className="flex-1 h-[1px] bg-[rgba(139,0,255,0.2)]" />
+          <span 
+            className="px-4 text-[13px] tracking-[0.4em] text-[rgba(139,0,255,0.6)]"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            ══ VERDICT FILED ══
+          </span>
+          <div className="flex-1 h-[1px] bg-[rgba(139,0,255,0.2)]" />
+        </div>
+
+        {/* VERDICT AND ARC */}
+        <div className="relative flex flex-col md:flex-row items-center justify-between gap-8 mb-[32px]">
+          <h2 
+            className="text-[#8B00FF]"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(52px, 7vw, 96px)',
+              letterSpacing: '0.05em',
+              textShadow: '0 0 40px rgba(139,0,255,0.6), 0 0 80px rgba(139,0,255,0.3)'
+            }}
+          >
+            {verdict.status || 'INCONCLUSIVE'}
+          </h2>
+          <CircularProgress value={verdict.confidence} />
+        </div>
+
+        {/* FINAL NARRATIVE */}
+        <div className="relative mb-[32px]">
+          <span 
+            className="block mb-4 text-[11px] tracking-[0.25em] text-[rgba(139,0,255,0.6)]"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            ─── NEURAL CONCLUSION ──
+          </span>
+          <p 
+            className="max-w-[800px] text-[16px] leading-[1.8] text-[rgba(232,232,240,0.8)]"
+            style={{ fontFamily: 'var(--font-body)' }}
+          >
+            {verdict.narrative}
+          </p>
+        </div>
+
+        {/* CAVEATS */}
+        {verdict.caveats && verdict.caveats.length > 0 && (
+          <div className="relative mb-[32px]">
+            <span 
+              className="block mb-3 text-[12px] tracking-[0.2em] text-[#FFB300]"
+              style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {isResolved ? 'CASE RESOLVED' : 'INCONCLUSIVE'}
-            </h2>
-          </div>
-
-          <div className="flex items-center justify-center gap-4 font-mono text-[14px] tracking-wider text-[#B0B0C8]">
-            <span>CONFIDENCE: {verdict.confidence_label.toUpperCase()}</span>
-            <span className="text-ghost-faint/30">|</span>
-            <span>
-              SURVIVORS:{' '}
-              {hypotheses.filter((h) => (h.confidence ?? h.plausibility_score) >= 0.35).length}/
-              {hypotheses.length}
+              ⚠ LIMITATIONS
             </span>
+            <ul className="flex flex-col gap-2">
+              {verdict.caveats.map((cav, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <div className="mt-[8px] h-1.5 w-1.5 rounded-full bg-[#FFB300] shadow-[0_0_8px_#FFB300]" />
+                  <span className="text-[14px] text-[rgba(232,232,240,0.6)]" style={{ fontFamily: 'var(--font-body)' }}>{cav}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
+        )}
 
-        {/* ── Summary & Details ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
-           {/* Left Column: Summary */}
-           <div className="flex flex-col gap-4">
-              <h4 className="font-mono text-[14px] tracking-[0.2em] text-electric-cyan uppercase">
-                Investigation Findings
-              </h4>
-              <p className="font-ui text-[16px] leading-relaxed text-ghost-white">
-                {verdict.summary}
-              </p>
-              {survivor && (
-                 <div className="mt-4 p-5 rounded-sm bg-black/40 border border-border-cyan/30">
-                   <h5 className="font-mono text-[12px] text-electric-cyan tracking-widest mb-2">PRIMARY HYPOTHESIS OVERVIEW</h5>
-                   <p className="font-ui text-[14px] text-[#B0B0C8] line-clamp-3">{survivor.description}</p>
-                 </div>
-              )}
-           </div>
-
-           {/* Right Column: Caveats & Sources */}
-           <div className="flex flex-col gap-6">
-              {verdict.caveats.length > 0 && (
-                <div className="p-5 rounded-sm bg-amber-400/5 border border-amber-400/15">
-                  <h4 className="font-mono text-[12px] tracking-[0.2em] text-amber-400/70 mb-3 uppercase">Caveats</h4>
-                  <ul className="space-y-2">
-                    {verdict.caveats.map((caveat, i) => (
-                      <li key={i} className="font-mono text-[13px] text-ghost-dim/70 flex items-start gap-3">
-                        <span className="text-amber-400 mt-0.5">⚠</span>
-                        {caveat}
-                      </li>
-                    ))}
-                  </ul>
+        {/* SOURCES */}
+        {verdict.sources && verdict.sources.length > 0 && (
+          <div className="relative mb-[32px]">
+            <span 
+              className="block mb-3 text-[12px] tracking-[0.15em] text-[rgba(0,245,255,0.6)]"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              ◎ INTELLIGENCE SOURCES
+            </span>
+            <div className="flex flex-wrap gap-[8px]">
+              {verdict.sources.map((src, i) => (
+                <div 
+                  key={i}
+                  className="rounded-[3px] border border-[rgba(0,245,255,0.1)] bg-[rgba(0,245,255,0.04)] px-[10px] py-[4px] text-[12px] text-[rgba(0,245,255,0.6)]"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                >
+                  {src}
                 </div>
-              )}
+              ))}
+            </div>
+          </div>
+        )}
 
-              {verdict.all_sources.length > 0 && (
-                <div>
-                  <h4 className="font-mono text-[12px] tracking-[0.2em] text-ghost-faint/50 mb-3 uppercase">
-                    Cited Sources ({verdict.all_sources.length})
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {verdict.all_sources.map((url, i) => {
-                      let domain = 'source';
-                      try { domain = new URL(url).hostname.replace('www.', ''); } catch { }
-                      return (
-                        <a
-                          key={i}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-ghost-faint/5 border border-border-glass
-                                     font-mono text-[11px] text-[#B0B0C8] hover:text-electric-cyan hover:border-electric-cyan
-                                     transition-all duration-200"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          {domain}
-                        </a>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-           </div>
+        {/* BUITONS */}
+        <div className="relative mt-[32px] flex flex-wrap gap-[16px]">
+          <button
+            onClick={handleExportDossier}
+            className="group relative rounded-full p-[2px]"
+            style={{
+              background: 'linear-gradient(135deg, rgba(139,0,255,0.6), rgba(0,245,255,0.6))',
+              boxShadow: '0 0 60px rgba(139,0,255,0.2)'
+            }}
+          >
+            <div className="flex items-center gap-2 overflow-hidden rounded-full bg-[rgba(6,0,16,0.9)] px-[24px] py-[12px] backdrop-blur-[16px] transition-colors duration-200 group-hover:bg-[rgba(139,0,255,0.1)] group-hover:shadow-[0_0_80px_rgba(139,0,255,0.5)]">
+               <Download className="h-[14px] w-[14px] text-[#8B00FF]" />
+               <span 
+                className="text-[#8B00FF]"
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.2em' }}
+              >
+                [ EXPORT DOSSIER ]
+              </span>
+            </div>
+          </button>
+
+          <button
+            onClick={onReset}
+            className="group flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.15)] bg-transparent px-[24px] py-[14px] transition-colors hover:border-[rgba(232,232,240,0.6)] hover:bg-[rgba(255,255,255,0.05)]"
+          >
+             <RefreshCw className="h-[14px] w-[14px] text-[rgba(232,232,240,0.7)] group-hover:text-[#E8E8F0]" />
+             <span 
+              className="text-[rgba(232,232,240,0.7)] group-hover:text-[#E8E8F0]"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', letterSpacing: '0.2em' }}
+            >
+              [ NEW INVESTIGATION ]
+            </span>
+          </button>
         </div>
-
-        {/* ── Final Meter & Actions ── */}
-        <div className="border-t border-toxic-violet/20 pt-8">
-           <div className="flex items-center justify-between mb-4">
-             <span className="font-mono text-[14px] tracking-widest text-[#B0B0C8] uppercase">
-                FINAL PROBABILITY SCORES
-             </span>
-             <span className="font-mono text-[32px] font-bold text-electric-cyan">
-               {formatConfidence(verdict.overall_confidence)}
-             </span>
-           </div>
-           
-           <div className="h-4 rounded-full bg-dark-matter/50 overflow-hidden border border-border-glass mb-10 w-full relative">
-             <motion.div
-               className="h-full rounded-full"
-               style={{ background: 'linear-gradient(90deg, #00F5FF, #8B00FF)', boxShadow: '0 0 15px rgba(139, 0, 255, 0.5)' }}
-               initial={{ width: 0 }}
-               animate={{ width: `${verdict.overall_confidence * 100}%` }}
-               transition={{ duration: 1.5, delay: 0.6, ease: 'easeOut' }}
-             />
-           </div>
-
-           <div className="flex flex-col sm:flex-row gap-4">
-             <button className="flex-1 flex items-center justify-center gap-3 px-8 py-4 font-mono text-[14px] tracking-[0.2em] bg-toxic-violet/10 border border-toxic-violet/30 text-toxic-violet hover:bg-toxic-violet/20 hover:border-toxic-violet transition-all duration-300 cursor-pointer">
-               <FileDown className="w-5 h-5" />
-               EXPORT FULL DOSSIER
-             </button>
-
-             <button onClick={onNewInvestigation} className="flex-1 flex items-center justify-center gap-3 px-8 py-4 font-mono text-[14px] tracking-[0.2em] bg-electric-cyan/10 border border-electric-cyan/30 text-electric-cyan hover:bg-electric-cyan/20 hover:border-electric-cyan transition-all duration-300 cursor-pointer shadow-[0_0_20px_rgba(0,245,255,0.1)] hover:shadow-[0_0_30px_rgba(0,245,255,0.3)]">
-               <RotateCcw className="w-5 h-5" />
-               NEW INVESTIGATION
-             </button>
-           </div>
-        </div>
-
       </div>
-    </motion.div>
+
+      {/* FAB */}
+      <AnimatePresence>
+        {showFab && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0 }}
+            whileHover={{ scale: 1.1, boxShadow: '0 0 40px rgba(0,245,255,0.5)' }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-[64px] right-[24px] z-[100] flex h-[44px] w-[44px] items-center justify-center rounded-full border border-[rgba(0,245,255,0.3)] bg-[rgba(6,0,16,0.9)]"
+            style={{ boxShadow: '0 0 20px rgba(0,245,255,0.2)' }}
+          >
+            <ArrowUp className="h-[20px] w-[20px] text-[var(--color-cyan)]" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
