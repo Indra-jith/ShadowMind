@@ -20,3 +20,8 @@ __pycache__/
 
 # Project specific
 *~
+node_modules/
+dist/
+build/
+.next/
+.vscode/
