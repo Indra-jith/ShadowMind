@@ -425,8 +425,12 @@ export function useInvestigation() {
   const connect = useCallback(() => {
     if (isMockMode) return;
 
-    const wsUrl = import.meta.env.VITE_WS_URL || 'localhost:8000';
-    const ws = new WebSocket(`ws://${wsUrl}/ws/investigate`);
+    const rawUrl = import.meta.env.VITE_WS_URL || 'localhost:8000';
+    const isFullUrl = rawUrl.startsWith('ws://') || rawUrl.startsWith('wss://');
+    const secureProto = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const finalUrl = isFullUrl ? `${rawUrl}/ws/investigate` : `${secureProto}${rawUrl}/ws/investigate`;
+    
+    const ws = new WebSocket(finalUrl);
 
     ws.onopen = () => {
       setState((prev) => ({ ...prev, isConnected: true }));
